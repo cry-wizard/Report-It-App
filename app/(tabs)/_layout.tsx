@@ -1,35 +1,53 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { View, Text } from 'react-native'
+import React from 'react'
+import { Tabs } from 'expo-router'
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+const _layout = () => {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
+    <Tabs screenOptions={{ headerShown: false, tabBarStyle: { height: 70, paddingBottom: 10 } }} >
+        <Tabs.Screen
+        name="ReportIssue"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Issue',
+          tabBarIcon: ({ color, focused, size }) => (
+            <MaterialIcons name={focused ? 'report' : 'report-problem'} color={color} size={size} />
+
+          ),
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="TrackIssue"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Report',
+          tabBarIcon: ({ color, focused, size }) => (
+            <Ionicons name={focused ? 'list-outline' : 'locate-outline'} color={color} size={size} />
+
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="MapViews"
+        options={{
+          title: 'Map',
+          tabBarIcon: ({ color, focused, size }) => (
+            <Ionicons name={focused ? 'map' : 'map-outline'} color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="Profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused, size }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} color={color} size={size} />
+          ),
         }}
       />
     </Tabs>
-  );
+    
+  )
 }
+
+export default _layout
