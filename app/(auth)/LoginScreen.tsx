@@ -21,7 +21,7 @@ const LoginScreen = () => {
     try {
       const { createdSessionId, setActive } = await startGoogle();
       if (createdSessionId) await setActive?.({ session: createdSessionId });
-      router.replace('/');
+      router.replace('/(tabs)/ReportIssue');
     } catch (err) {
       console.error("Google OAuth error", err);
     }
@@ -31,7 +31,7 @@ const LoginScreen = () => {
     try {
       const { createdSessionId, setActive } = await startFacebook();
       if (createdSessionId) await setActive?.({ session: createdSessionId });
-      router.replace('/');
+      router.replace('/(tabs)/ReportIssue');
     } catch (err) {
       console.error("Facebook OAuth error", err);
     }

@@ -5,7 +5,8 @@ import {
   TextInput, 
   TouchableOpacity, 
   View, 
-  Image 
+  Image, 
+  StatusBar
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -98,6 +99,7 @@ const ReportIssue = () => {
             </View>
           )}
 
+          <StatusBar  backgroundColor='transparent' />
           {/* Media Buttons */}
           <Text style={styles.sectionTitle}>Add Media</Text>
           <View style={styles.mediaRow}>
