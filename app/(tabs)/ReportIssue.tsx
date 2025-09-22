@@ -1,12 +1,13 @@
-import { 
-  ScrollView, 
-  StyleSheet, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  View, 
-  Image, 
-  StatusBar
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Image,
+  StatusBar,
+  Alert,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -15,50 +16,126 @@ import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import * as ImagePicker from "expo-image-picker";
 import * as Animatable from "react-native-animatable";
 import * as Location from "expo-location";
+import { useUser } from "@clerk/clerk-expo";
+
+const API_URL = "https://isuue-report-api.onrender.com/api"; // backend
+const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dfd6cezyy/image/upload";
+const UPLOAD_PRESET = "NagarSetu";
+
 const ReportIssue = () => {
+  const { user } = useUser();
+  const email = user?.primaryEmailAddress?.emailAddress ?? "guest@example.com";
+
   const [zone, setZone] = useState("North");
-  const [media, setMedia] = useState([]);
+  const [media, setMedia] = useState<string[]>([]);
   const [category, setCategory] = useState("Others");
-  const [locationCoords, setLocationCoords] = useState(null);
+  const [locationCoords, setLocationCoords] = useState<any>(null);
   const [description, setDescription] = useState("");
   const [locationName, setLocationName] = useState("Fetching location...");
+  const [loading, setLoading] = useState(false);
 
-  // ✅ Camera / Gallery handlers
+  // 📷 Open Camera
   const openCamera = async () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.5,
       });
-      if (!result.canceled) setMedia([result.assets[0].uri]); // replace old image
+      if (!result.canceled) setMedia([result.assets[0].uri]);
     } catch (err) {
-      console.error(err);
+      console.error("Camera error:", err);
     }
   };
 
-  const openGallery = async () => {
+  // 🖼️ Open Gallery
+  // const openGallery = async () => {
+  //   try {
+  //     const result = await ImagePicker.launchImageLibraryAsync({
+  //       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  //       quality: 0.5,
+  //     });
+  //     if (!result.canceled) setMedia([result.assets[0].uri]);
+  //   } catch (err) {
+  //     console.error("Gallery error:", err);
+  //   }
+  // };
+
+  // ☁️ Upload image to Cloudinary
+  const uploadImageToCloudinary = async (uri: string) => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.5,
+      const data = new FormData();
+      data.append("file", {
+        uri,
+        type: "image/jpeg",
+        name: "upload.jpg",
+      } as any);
+      data.append("upload_preset", UPLOAD_PRESET);
+
+      const res = await fetch(CLOUDINARY_URL, {
+        method: "POST",
+        body: data,
       });
-      if (!result.canceled) setMedia([result.assets[0].uri]); // replace old image
+
+      const file = await res.json();
+      if (!file.secure_url) throw new Error("Cloudinary upload failed");
+      return file.secure_url;
     } catch (err) {
-      console.error(err);
+      console.error("Cloudinary error:", err);
+      throw err;
     }
   };
 
-  // ✅ Submit handler
-  const handleSubmit = () => {
+  // 📩 Submit report
+  const handleSubmit = async () => {
     if (!media.length || !description || !locationCoords) {
-      alert("Please fill in all required fields.");
+      Alert.alert("Missing Info", "Please fill in all required fields.");
       return;
     }
-    console.log("Submitting report...");
-    console.log({ zone, category, description, media, locationCoords });
+
+    try {
+      setLoading(true);
+
+      // 1. Upload to Cloudinary
+      const imageUrl = await uploadImageToCloudinary(media[0]);
+
+      // 2. Send to backend
+      const response = await fetch(`${API_URL}/report/reportIssue`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          zone,
+          category,
+          description,
+          image: imageUrl,
+          location: `${locationCoords.latitude},${locationCoords.longitude}`,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to save report");
+      const data = await response.json();
+      console.log("✅ Report submitted:", data);
+
+      Alert.alert("Success", "Report submitted successfully!");
+
+      // Reset fields
+      setZone("North");
+      setCategory("Others");
+      setDescription("");
+      setMedia([]);
+      setLocationCoords(null);
+      setLocationName("Fetching location...");
+    } catch (error) {
+      console.error("❌ Error submitting report:", error);
+      Alert.alert("Error", "Failed to submit report. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ✅ Fetch location + reverse geocode
+  // 📍 Get location
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -73,44 +150,48 @@ const ReportIssue = () => {
       let geocode = await Location.reverseGeocodeAsync(location.coords);
       if (geocode.length > 0) {
         const place = geocode[0];
-        const fullAddress = `${place.name || ""} ${place.street || ""}, ${place.city || ""}, ${place.region || ""}`;
+        const fullAddress = `${place.name || ""} ${place.street || ""}, ${
+          place.city || ""
+        }, ${place.region || ""}`;
         setLocationName(fullAddress.trim());
       }
     })();
   }, []);
+
   return (
     <View style={styles.container}>
-      {/* ✅ Fixed Header */}
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Report an Issue</Text>
       </View>
 
-      {/* ✅ Scrollable Content */}
-      <ScrollView 
+      {/* Scrollable Body */}
+      <ScrollView
         contentContainerStyle={{ paddingBottom: 30 }}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.body}>
-          {/* ✅ Image Preview (if exists) */}
+          {/* Preview */}
           {media.length > 0 && (
             <View style={styles.imagePreviewContainer}>
               <Image source={{ uri: media[0] }} style={styles.imagePreview} />
-              <Text style={styles.imageHint}>Tap Camera or Gallery to update</Text>
+              <Text style={styles.imageHint}>
+                Tap Camera or Gallery to update
+              </Text>
             </View>
           )}
 
-          <StatusBar  backgroundColor='transparent' />
-          {/* Media Buttons */}
+          <StatusBar backgroundColor="transparent" />
           <Text style={styles.sectionTitle}>Add Media</Text>
           <View style={styles.mediaRow}>
             <TouchableOpacity style={styles.mediaButton} onPress={openCamera}>
               <MaterialIcons name="photo-camera" size={32} color="#475569" />
               <Text style={styles.mediaText}>Camera</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.mediaButton} onPress={openGallery}>
+            {/* <TouchableOpacity style={styles.mediaButton} onPress={openGallery}>
               <MaterialIcons name="photo-library" size={32} color="#475569" />
               <Text style={styles.mediaText}>Gallery</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
 
           {/* Zone */}
@@ -135,10 +216,11 @@ const ReportIssue = () => {
           </View>
           <View style={styles.pickerContainer}>
             <Picker selectedValue={category} onValueChange={setCategory}>
-              <Picker.Item label="Pithole" value="Pithole" />
+              <Picker.Item label="Pothole" value="Pithole" />
               <Picker.Item label="Waterlogging" value="Waterlogging" />
               <Picker.Item label="Garbage" value="Garbage" />
-              <Picker.Item label="Animal" value="Animal" />
+              <Picker.Item label="Street Light" value="Street Light" />
+              <Picker.Item label="Other" value="Other" />
             </Picker>
           </View>
 
@@ -172,55 +254,49 @@ const ReportIssue = () => {
             onChangeText={setDescription}
           />
 
-          {/* Submit Button */}
-          <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-            <Text style={styles.buttonText}>Submit</Text>
+          {/* Submit */}
+          <TouchableOpacity
+            style={[styles.button, loading && { opacity: 0.6 }]}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? "Submitting..." : "Submit"}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
-  )
-}
+  );
+};
 
-export default ReportIssue
+export default ReportIssue;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9fafb" },
-
-  // ✅ Fixed Header
   header: {
     padding: 16,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-
+  headerTitle: { fontSize: 20, fontWeight: "bold", textAlign: "center" },
   body: { paddingHorizontal: 16, paddingVertical: 8 },
   sectionTitle: { fontSize: 16, fontWeight: "400", padding: 15 },
-
-  // ✅ Image Preview
-  imagePreviewContainer: {
-    alignItems: "center",
-    marginBottom: 10,
-  },
+  imagePreviewContainer: { alignItems: "center", marginBottom: 10 },
   imagePreview: {
     width: "100%",
     height: 200,
     borderRadius: 12,
     resizeMode: "cover",
   },
-  imageHint: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#64748b",
+  imageHint: { marginTop: 6, fontSize: 12, color: "#64748b" },
+  mediaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+    gap: 8,
   },
-
-  mediaRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 8, gap: 8 },
   mediaButton: {
     flex: 1,
     alignItems: "center",
@@ -232,10 +308,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   mediaText: { fontSize: 14, fontWeight: "500", color: "#475569" },
-
   row: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 25 },
   label: { fontSize: 16, fontWeight: "500" },
-
   pickerContainer: {
     paddingHorizontal: 10,
     borderWidth: 2,
@@ -243,9 +317,12 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginTop: 5,
   },
-
-  title: { fontSize: 16, fontWeight: "600", color: "#475569", marginVertical: 12 },
-
+  title: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#475569",
+    marginVertical: 12,
+  },
   locationCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -268,7 +345,6 @@ const styles = StyleSheet.create({
   locationText: { fontSize: 16, fontWeight: "600", color: "#1e293b" },
   statusText: { fontSize: 14, color: "#64748b" },
   gpsIcon: { marginLeft: "auto" },
-
   descriptionInput: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -278,7 +354,6 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: "top",
   },
-
   button: {
     width: "100%",
     justifyContent: "center",
@@ -289,4 +364,4 @@ const styles = StyleSheet.create({
     height: 50,
   },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-})
+});

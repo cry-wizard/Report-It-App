@@ -21,7 +21,7 @@ const LoginScreen = () => {
     try {
       const { createdSessionId, setActive } = await startGoogle();
       if (createdSessionId) await setActive?.({ session: createdSessionId });
-      router.replace('/(tabs)/ReportIssue');
+      router.push('/(tabs)/ReportIssue');
     } catch (err) {
       console.error("Google OAuth error", err);
     }

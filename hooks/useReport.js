@@ -1,7 +1,7 @@
 import { useCallback } from "react"
 import { useState } from "react"
 
-const API_URL = "http://10.0.2.2:5000/api";
+const API_URL = "https://isuue-report-api.onrender.com/api";
 export const useReport = (email) => { 
   const [issue, setIssue] = useState([]);
 
